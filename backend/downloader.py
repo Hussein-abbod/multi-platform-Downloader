@@ -7,6 +7,7 @@ import re
 import logging
 from pathlib import Path
 from typing import Dict, Any, Callable, Optional
+import shutil
 import yt_dlp
 
 from backend.utils import detect_platform, sanitize_filename
@@ -16,6 +17,12 @@ logger = logging.getLogger(__name__)
 # App-wide settings from environment
 DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR", "downloads")
 FFMPEG_PATH = os.getenv("FFMPEG_LOCATION")
+
+# Auto-detect ffmpeg if not explicitly set in .env (crucial for Linux/Render)
+if not FFMPEG_PATH:
+    detected_ffmpeg = shutil.which("ffmpeg")
+    if detected_ffmpeg:
+        FFMPEG_PATH = os.path.dirname(detected_ffmpeg)
 
 AUDIO_FORMAT = "bestaudio/best"
 
