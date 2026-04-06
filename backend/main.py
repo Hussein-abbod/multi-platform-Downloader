@@ -29,6 +29,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR", "downloads")
 Path(DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
 
