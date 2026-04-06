@@ -184,7 +184,6 @@ async def health():
     return {
         "status": "ok",
         "env": "production" if os.getenv("RENDER") else "development",
-        "cache": cache_manager.stats(),
         "queue": {
             "size": download_queue._queue.qsize(),
             "max_concurrent": int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3")),

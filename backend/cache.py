@@ -83,25 +83,6 @@ class CacheManager:
         self._save_to_disk()
         logger.info(f"Cache SET for key {key[:8]}...")
 
-    def cleanup_expired(self):
-        """Remove expired entries."""
-        now = time.time()
-        before = len(self._memory)
-        self._memory = {
-            k: v for k, v in self._memory.items()
-            if now - v.get("created_at", 0) < CACHE_TTL
-        }
-        removed = before - len(self._memory)
-        if removed:
-            self._save_to_disk()
-            logger.info(f"Cache cleanup: removed {removed} expired entries")
-
-    def stats(self) -> Dict:
-        return {
-            "total_entries": len(self._memory),
-            "ttl_seconds": CACHE_TTL,
-        }
-
 
 # Singleton instance
 cache_manager = CacheManager()
