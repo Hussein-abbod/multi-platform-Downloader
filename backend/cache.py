@@ -83,14 +83,6 @@ class CacheManager:
         self._save_to_disk()
         logger.info(f"Cache SET for key {key[:8]}...")
 
-    def remove(self, url: str, quality: str, fmt: str):
-        """Explicitly remove an entry from cache."""
-        key = self._make_key(url, quality, fmt)
-        if key in self._memory:
-            del self._memory[key]
-            self._save_to_disk()
-            logger.info(f"Cache REMOVE for key {key[:8]}...")
-
     def cleanup_expired(self):
         """Remove expired entries."""
         now = time.time()

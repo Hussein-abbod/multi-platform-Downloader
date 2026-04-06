@@ -33,18 +33,6 @@ DOWNLOAD_DIR = os.getenv("DOWNLOAD_DIR", "downloads")
 Path(DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
 
-def remove_file(path: str, url: str = None, quality: str = None, fmt: str = None):
-    """Delete a file from disk and optionally clear it from cache."""
-    try:
-        if path and os.path.exists(path):
-            os.remove(path)
-            logger.info(f"🗑️ Deleted temporary file: {path}")
-        if url and quality and fmt:
-            cache_manager.remove(url, quality, fmt)
-    except Exception as e:
-        logger.error(f"Error during cleanup: {e}")
-
-
 # ─────────────────────────────────────────────
 # Lifespan: start/stop background queue worker
 # ─────────────────────────────────────────────
@@ -164,9 +152,9 @@ async def get_status(task_id: str):
 
 
 @app.get("/api/file/{task_id}")
-async def download_file(task_id: str, background_tasks: BackgroundTasks):
+async def download_file(task_id: str):
     """
-    Serve the downloaded file as an attachment and delete it afterwards.
+    Serve the downloaded file as an attachment.
     """
     task = download_queue.get_task(task_id)
     if not task:
@@ -175,15 +163,6 @@ async def download_file(task_id: str, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=400, detail="Download not yet complete")
     if not task.filepath or not os.path.exists(task.filepath):
         raise HTTPException(status_code=404, detail="File not found on server")
-
-    # Schedule deletion after the response is sent
-    background_tasks.add_task(
-        remove_file,
-        task.filepath,
-        task.url,
-        task.quality,
-        task.format
-    )
 
     return FileResponse(
         path=task.filepath,
