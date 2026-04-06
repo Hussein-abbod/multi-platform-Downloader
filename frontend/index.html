@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StreamGrab — Multi-Platform Video Downloader</title>
+  <meta name="description" content="Download videos from YouTube, Instagram, Twitter, TikTok and more in any quality. Supports audio-only extraction." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Reset & Base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep:      #080b14;
+      --bg-card:      rgba(255,255,255,0.04);
+      --bg-card-h:    rgba(255,255,255,0.07);
+      --border:       rgba(255,255,255,0.08);
+      --border-h:     rgba(255,255,255,0.18);
+      --text-primary: #f0f4ff;
+      --text-muted:   #7a85a3;
+      --text-dim:     #4a5270;
+      --accent:       #6c63ff;
+      --accent2:      #a855f7;
+      --accent3:      #06b6d4;
+      --green:        #22c55e;
+      --red:          #ef4444;
+      --yellow:       #f59e0b;
+      --radius-sm:    8px;
+      --radius-md:    14px;
+      --radius-lg:    22px;
+      --radius-xl:    32px;
+      --glow:         0 0 40px rgba(108,99,255,0.25);
+      --shadow-card:  0 8px 40px rgba(0,0,0,0.5);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── Animated Gradient Background ─── */
+    .bg-orbs {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    }
+    .orb {
+      position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.18;
+      animation: floatOrb 20s ease-in-out infinite alternate;
+    }
+    .orb-1 { width: 600px; height: 600px; background: #6c63ff; top: -200px; left: -150px; animation-delay: 0s; }
+    .orb-2 { width: 450px; height: 450px; background: #a855f7; bottom: -100px; right: -100px; animation-delay: -7s; }
+    .orb-3 { width: 350px; height: 350px; background: #06b6d4; top: 40%; left: 50%; animation-delay: -14s; }
+
+    @keyframes floatOrb {
+      0%   { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(40px, 30px) scale(1.1); }
+    }
+
+    /* ─── Layout ─── */
+    .container {
+      position: relative; z-index: 1;
+      max-width: 860px; margin: 0 auto; padding: 0 20px 80px;
+    }
+
+    /* ─── Header ─── */
+    header {
+      text-align: center; padding: 60px 0 48px;
+    }
+    .logo-badge {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: rgba(108,99,255,0.12);
+      border: 1px solid rgba(108,99,255,0.3);
+      border-radius: 999px; padding: 6px 18px; margin-bottom: 24px;
+      font-size: 13px; font-weight: 600; color: #a5a0ff;
+      letter-spacing: 0.05em;
+    }
+    .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+
+    h1 {
+      font-size: clamp(2.2rem, 6vw, 3.8rem);
+      font-weight: 900; line-height: 1.1; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #f0f4ff 0%, #a5a0ff 50%, #c084fc 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 16px;
+    }
+    .subtitle {
+      font-size: 1.05rem; color: var(--text-muted); max-width: 480px;
+      margin: 0 auto; line-height: 1.6;
+    }
+
+    /* ─── Platform Chips ─── */
+    .platforms {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+      margin: 28px 0 0;
+    }
+    .chip {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 999px; padding: 5px 14px; font-size: 12px;
+      font-weight: 500; color: var(--text-muted);
+      transition: all 0.2s ease;
+    }
+    .chip:hover { border-color: var(--border-h); color: var(--text-primary); transform: translateY(-1px); }
+
+    /* ─── Main Card ─── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 36px;
+      box-shadow: var(--shadow-card);
+      backdrop-filter: blur(20px);
+      transition: border-color 0.3s ease;
+      margin-top: 40px;
+    }
+    .card:hover { border-color: var(--border-h); }
+
+    /* ─── URL Input Row ─── */
+    .url-section { margin-bottom: 28px; }
+    .url-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+    .url-row {
+      display: flex; gap: 10px; position: relative;
+    }
+    .url-input-wrap {
+      flex: 1; position: relative;
+    }
+    #urlInput {
+      width: 100%; padding: 14px 50px 14px 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif; font-size: 15px;
+      outline: none; transition: all 0.25s ease;
+    }
+    #urlInput::placeholder { color: var(--text-dim); }
+    #urlInput:focus {
+      border-color: var(--accent);
+      background: rgba(108,99,255,0.06);
+      box-shadow: 0 0 0 3px rgba(108,99,255,0.15);
+    }
+    .platform-badge {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      font-size: 18px; transition: all 0.2s ease; display: none;
+    }
+
+    /* Paste button */
+    #pasteBtn {
+      padding: 14px 20px; border-radius: var(--radius-md);
+      border: 1px solid var(--border); background: var(--bg-card);
+      color: var(--text-muted); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
+    }
+    #pasteBtn:hover { border-color: var(--border-h); color: var(--text-primary); }
+
+    /* ─── Options Row ─── */
+    .options-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      margin-bottom: 24px;
+    }
+    .option-group { display: flex; flex-direction: column; gap: 8px; }
+    .option-label {
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+
+    select {
+      width: 100%; padding: 12px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif; font-size: 14px;
+      outline: none; cursor: pointer; transition: all 0.25s ease;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a85a3' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
+      padding-right: 40px;
+    }
+    select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,99,255,0.15); }
+    select option { background: #15192e; }
+
+    /* ─── Format Toggle ─── */
+    .format-toggle {
+      display: flex; border: 1px solid var(--border);
+      border-radius: var(--radius-md); overflow: hidden; height: 46px;
+    }
+    .toggle-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      gap: 7px; border: none; background: transparent;
+      color: var(--text-muted); font-family: 'Inter', sans-serif;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .toggle-btn.active {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+    }
+    .toggle-btn:hover:not(.active) { background: var(--bg-card-h); color: var(--text-primary); }
+
+    /* ─── Action Buttons ─── */
+    .actions { display: flex; gap: 10px; margin-bottom: 0; }
+    .btn {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; padding: 14px 24px; border-radius: var(--radius-md);
+      border: none; font-family: 'Inter', sans-serif; font-size: 14px;
+      font-weight: 600; cursor: pointer; transition: all 0.22s ease;
+      text-decoration: none;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      color: #fff; flex: 1;
+      box-shadow: 0 4px 20px rgba(108,99,255,0.35);
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(108,99,255,0.5);
+    }
+    .btn-secondary {
+      background: var(--bg-card); border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .btn-secondary:hover:not(:disabled) {
+      border-color: var(--border-h); color: var(--text-primary);
+    }
+    .btn-download {
+      background: linear-gradient(135deg, #0ea5e9 0%, var(--accent3) 100%);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(6,182,212,0.35);
+    }
+    .btn-download:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(6,182,212,0.5); }
+
+    /* ─── Video Info Panel ─── */
+    #infoPanel {
+      display: none; margin-top: 24px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 20px;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .info-inner {
+      display: flex; gap: 18px; align-items: flex-start;
+    }
+    #infoThumb {
+      width: 120px; height: 72px; object-fit: cover;
+      border-radius: var(--radius-sm); flex-shrink: 0;
+      background: var(--bg-card);
+    }
+    .info-text { flex: 1; min-width: 0; }
+    .info-title {
+      font-size: 15px; font-weight: 600; color: var(--text-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 6px;
+    }
+    .info-meta {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;
+    }
+    .meta-tag {
+      font-size: 12px; color: var(--text-muted);
+      background: rgba(255,255,255,0.05);
+      border-radius: 999px; padding: 3px 10px;
+    }
+
+    /* ─── Progress Section ─── */
+    #progressSection {
+      display: none; margin-top: 24px; animation: slideIn 0.3s ease;
+    }
+    .progress-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    .progress-label { font-size: 14px; font-weight: 500; color: var(--text-muted); }
+    .progress-pct { font-size: 14px; font-weight: 700; color: var(--accent); }
+    .progress-track {
+      width: 100%; height: 8px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 999px; overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+      border-radius: 999px;
+      transition: width 0.4s ease;
+      background-size: 200% 100%;
+      animation: shimmer 2s linear infinite;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 10px; font-size: 13px; font-weight: 500;
+      border-radius: 999px; padding: 4px 12px;
+    }
+    .status-badge.queued   { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .status-badge.processing { background: rgba(108,99,255,0.15); color: #a5a0ff; }
+    .status-badge.done     { background: rgba(34,197,94,0.15); color: var(--green); }
+    .status-badge.error    { background: rgba(239,68,68,0.15); color: var(--red); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .status-dot.queued    { background: var(--yellow); }
+    .status-dot.processing { background: var(--accent); animation: pulse 1s ease infinite; }
+    .status-dot.done      { background: var(--green); }
+    .status-dot.error     { background: var(--red); }
+
+    /* ─── Download Result ─── */
+    #downloadResult {
+      display: none; margin-top: 16px;
+      padding: 18px 20px;
+      background: rgba(34,197,94,0.06);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: var(--radius-md);
+      animation: slideIn 0.3s ease;
+    }
+    .result-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .result-icon { font-size: 28px; }
+    .result-text { flex: 1; min-width: 0; }
+    .result-title { font-size: 14px; font-weight: 600; color: var(--green); margin-bottom: 3px; }
+    .result-filename {
+      font-size: 12px; color: var(--text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #errorMsg {
+      display: none; margin-top: 16px; padding: 14px 16px;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25);
+      border-radius: var(--radius-md); color: var(--red); font-size: 13px;
+      animation: slideIn 0.3s ease;
+    }
+
+    /* ─── Queue Panel ─── */
+    .queue-section { margin-top: 40px; }
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 16px; font-weight: 700; color: var(--text-primary);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .queue-badge {
+      background: rgba(108,99,255,0.2); color: var(--accent);
+      border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700;
+    }
+    .queue-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 16px; text-align: center;
+    }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--text-primary); }
+    .stat-label { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+    /* ─── Task List ─── */
+    .task-list { display: flex; flex-direction: column; gap: 8px; }
+    .task-item {
+      display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-md); transition: border-color 0.2s ease;
+    }
+    .task-item:hover { border-color: var(--border-h); }
+    .task-emoji { font-size: 20px; flex-shrink: 0; }
+    .task-info { flex: 1; min-width: 0; }
+    .task-name {
+      font-size: 13px; font-weight: 500; color: var(--text-primary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .task-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .task-status-badge {
+      font-size: 11px; font-weight: 600; border-radius: 999px; padding: 3px 10px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .ts-queued    { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .ts-processing { background: rgba(108,99,255,0.15); color: #a5a0ff; }
+    .ts-done      { background: rgba(34,197,94,0.15); color: var(--green); }
+    .ts-error     { background: rgba(239,68,68,0.15); color: var(--red); }
+
+    .empty-queue {
+      text-align: center; padding: 32px; color: var(--text-dim); font-size: 14px;
+    }
+
+    /* ─── Footer ─── */
+    footer {
+      text-align: center; margin-top: 60px; padding: 24px;
+      color: var(--text-dim); font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+    footer span { color: var(--accent); }
+
+    /* ─── Spinner ─── */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 600px) {
+      .card { padding: 22px; }
+      .options-grid { grid-template-columns: 1fr; }
+      .queue-stats { grid-template-columns: repeat(3, 1fr); }
+      .info-inner { flex-direction: column; }
+      #infoThumb { width: 100%; height: 160px; }
+      .url-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Animated Background Orbs -->
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<div class="container">
+
+  <!-- ─── Header ─── -->
+  <header>
+    <div class="logo-badge">
+      <div class="logo-dot"></div>
+      StreamGrab v1.0
+    </div>
+    <h1>Multi-Platform<br/>Video Downloader</h1>
+    <p class="subtitle">
+      Download from YouTube, Instagram, Twitter, TikTok and 1000+ platforms — any quality, any format.
+    </p>
+    <div class="platforms">
+      <div class="chip">🎬 YouTube</div>
+      <div class="chip">📷 Instagram</div>
+      <div class="chip">🐦 Twitter / X</div>
+      <div class="chip">🎵 TikTok</div>
+      <div class="chip">👥 Facebook</div>
+      <div class="chip">🎥 Vimeo</div>
+      <div class="chip">🟣 Twitch</div>
+      <div class="chip">🤖 Reddit</div>
+    </div>
+  </header>
+
+  <!-- ─── Main Card ─── -->
+  <div class="card">
+
+    <!-- URL Input -->
+    <div class="url-section">
+      <div class="url-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Video URL
+      </div>
+      <div class="url-row">
+        <div class="url-input-wrap">
+          <input
+            type="url"
+            id="urlInput"
+            placeholder="Paste a YouTube, TikTok, Instagram, or Twitter link…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <span class="platform-badge" id="platformBadge"></span>
+        </div>
+        <button class="btn btn-secondary" id="pasteBtn" title="Paste from clipboard">
+          📋 Paste
+        </button>
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="options-grid">
+      <div class="option-group">
+        <div class="option-label">Quality</div>
+        <select id="qualitySelect">
+          <option value="best">⭐ Best Available</option>
+          <option value="2160p">🔥 4K (2160p)</option>
+          <option value="1080p">💎 Full HD (1080p)</option>
+          <option value="720p">✨ HD (720p)</option>
+          <option value="480p">📺 SD (480p)</option>
+          <option value="360p">📱 Mobile (360p)</option>
+          <option value="240p">💾 Low (240p)</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <div class="option-label">Format</div>
+        <div class="format-toggle">
+          <button class="toggle-btn active" id="fmtVideo" onclick="setFormat('video')">
+            <span>🎬</span> Video
+          </button>
+          <button class="toggle-btn" id="fmtAudio" onclick="setFormat('audio')">
+            <span>🎵</span> Audio MP3
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+      <button class="btn btn-secondary" id="infoBtn" onclick="fetchInfo()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        Fetch Info
+      </button>
+      <button class="btn btn-primary" id="downloadBtn" onclick="startDownload()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </button>
+    </div>
+
+    <!-- Info Panel -->
+    <div id="infoPanel">
+      <div class="info-inner">
+        <img id="infoThumb" src="" alt="thumbnail" />
+        <div class="info-text">
+          <div class="info-title" id="infoTitle"></div>
+          <div class="info-meta">
+            <span class="meta-tag" id="infoUploader"></span>
+            <span class="meta-tag" id="infoDuration"></span>
+            <span class="meta-tag" id="infoPlatform"></span>
+            <span class="meta-tag" id="infoViews"></span>
+          </div>
+          <div class="info-meta" id="infoFormats"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="progressSection">
+      <div class="progress-header">
+        <div class="progress-label" id="progressLabel">Preparing download…</div>
+        <div class="progress-pct" id="progressPct">0%</div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div>
+        <span class="status-badge queued" id="statusBadge">
+          <span class="status-dot queued"></span>
+          Queued
+        </span>
+      </div>
+    </div>
+
+    <!-- Download Ready -->
+    <div id="downloadResult">
+      <div class="result-row">
+        <div class="result-icon">✅</div>
+        <div class="result-text">
+          <div class="result-title">Ready to Download!</div>
+          <div class="result-filename" id="resultFilename"></div>
+        </div>
+        <a href="#" class="btn btn-download" id="downloadLink" download>
+          ⬇️ Save File
+        </a>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="errorMsg"></div>
+
+  </div><!-- /card -->
+
+
+  <!-- ─── Queue Panel ─── -->
+  <div class="queue-section">
+    <div class="section-header">
+      <div class="section-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Download Queue
+        <span class="queue-badge" id="queueBadge">0</span>
+      </div>
+      <button class="btn btn-secondary" style="padding:7px 14px;font-size:12px" onclick="refreshQueue()">Refresh</button>
+    </div>
+
+    <div class="queue-stats">
+      <div class="stat-card">
+        <div class="stat-value" id="statQueued">0</div>
+        <div class="stat-label">Waiting</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statActive">0</div>
+        <div class="stat-label">Active</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statMax">3</div>
+        <div class="stat-label">Max Slots</div>
+      </div>
+    </div>
+
+    <div class="task-list" id="taskList">
+      <div class="empty-queue">Queue is empty — start a download above 🚀</div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<footer>
+  Built with ❤️ using <span>FastAPI</span> + <span>yt-dlp</span> &nbsp;·&nbsp; StreamGrab v1.0
+</footer>
+
+<script>
+  // ─── State ───
+  let currentFormat = 'video';
+  let currentTaskId = null;
+  let pollingInterval = null;
+  const API = '';   // Same-origin (empty = relative)
+
+  const PLATFORM_ICONS = {
+    YouTube: '🎬', Instagram: '📷', Twitter: '🐦', TikTok: '🎵',
+    Facebook: '👥', Reddit: '🤖', Twitch: '🟣', Vimeo: '🎥',
+    Dailymotion: '📹', Unknown: '🌐',
+  };
+  const PLATFORM_PATTERNS = {
+    YouTube:    [/youtube\.com/, /youtu\.be/],
+    Instagram:  [/instagram\.com/],
+    Twitter:    [/twitter\.com/, /x\.com/],
+    TikTok:     [/tiktok\.com/, /vm\.tiktok\.com/],
+    Facebook:   [/facebook\.com/, /fb\.watch/],
+    Reddit:     [/reddit\.com/, /v\.redd\.it/],
+    Twitch:     [/twitch\.tv/],
+    Vimeo:      [/vimeo\.com/],
+    Dailymotion:[/dailymotion\.com/],
+  };
+
+  // ─── Helpers ───
+  function detectPlatform(url) {
+    const lower = url.toLowerCase();
+    for (const [platform, patterns] of Object.entries(PLATFORM_PATTERNS)) {
+      if (patterns.some(p => p.test(lower))) return platform;
+    }
+    return 'Unknown';
+  }
+
+  function formatDuration(s) {
+    if (!s) return '';
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return h ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+             : `${m}:${String(sec).padStart(2,'0')}`;
+  }
+  function formatViews(n) {
+    if (!n) return '';
+    if (n >= 1e6) return `${(n/1e6).toFixed(1)}M views`;
+    if (n >= 1e3) return `${(n/1e3).toFixed(1)}K views`;
+    return `${n} views`;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 8000);
+  }
+
+  function hideError() {
+    document.getElementById('errorMsg').style.display = 'none';
+  }
+
+  function setProgress(pct, label, status) {
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = Math.round(pct) + '%';
+    if (label) document.getElementById('progressLabel').textContent = label;
+    if (status) {
+      const badge = document.getElementById('statusBadge');
+      badge.className = `status-badge ${status}`;
+      badge.innerHTML = `<span class="status-dot ${status}"></span> ${capitalize(status)}`;
+    }
+  }
+
+  function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function setLoadingBtn(btnId, loading, text) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = loading;
+    btn.innerHTML = loading
+      ? `<span class="spinner"></span> ${text}`
+      : (btnId === 'downloadBtn'
+          ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download`
+          : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> Fetch Info`);
+  }
+
+  // ─── URL Input: live platform detection ───
+  document.getElementById('urlInput').addEventListener('input', e => {
+    const url = e.target.value.trim();
+    const badge = document.getElementById('platformBadge');
+    if (url.startsWith('http')) {
+      const p = detectPlatform(url);
+      badge.textContent = PLATFORM_ICONS[p];
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+    // Hide panels on new input
+    document.getElementById('infoPanel').style.display = 'none';
+    document.getElementById('progressSection').style.display = 'none';
+    document.getElementById('downloadResult').style.display = 'none';
+    hideError();
+    stopPolling();
+  });
+
+  // ─── Paste Button ───
+  document.getElementById('pasteBtn').addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.getElementById('urlInput').value = text;
+      document.getElementById('urlInput').dispatchEvent(new Event('input'));
+    } catch { showError('Clipboard access denied. Please paste manually.'); }
+  });
+
+  // ─── Format Toggle ───
+  function setFormat(fmt) {
+    currentFormat = fmt;
+    document.getElementById('fmtVideo').classList.toggle('active', fmt === 'video');
+    document.getElementById('fmtAudio').classList.toggle('active', fmt === 'audio');
+    const qs = document.getElementById('qualitySelect');
+    qs.disabled = fmt === 'audio';
+    qs.style.opacity = fmt === 'audio' ? '0.4' : '1';
+  }
+
+  // ─── Fetch Info ───
+  async function fetchInfo() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) { showError('Please enter a URL first.'); return; }
+    hideError();
+    setLoadingBtn('infoBtn', true, 'Fetching…');
+    document.getElementById('infoPanel').style.display = 'none';
+    try {
+      const res = await fetch('/api/info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to fetch video info');
+      const info = data.data;
+      renderInfo(info);
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      setLoadingBtn('infoBtn', false);
+    }
+  }
+
+  function renderInfo(info) {
+    const icon = PLATFORM_ICONS[info.platform] || '🌐';
+    if (info.thumbnail) {
+      const img = document.getElementById('infoThumb');
+      img.src = info.thumbnail;
+      img.style.display = 'block';
+    } else {
+      document.getElementById('infoThumb').style.display = 'none';
+    }
+    document.getElementById('infoTitle').textContent = info.title;
+    document.getElementById('infoUploader').textContent = `👤 ${info.uploader || 'Unknown'}`;
+    document.getElementById('infoDuration').textContent = info.duration ? `⏱ ${formatDuration(info.duration)}` : '';
+    document.getElementById('infoPlatform').textContent = `${icon} ${info.platform}`;
+    const views = formatViews(info.view_count);
+    const viewEl = document.getElementById('infoViews');
+    viewEl.textContent = views; viewEl.style.display = views ? '' : 'none';
+
+    // Quality chips
+    const fmtsEl = document.getElementById('infoFormats');
+    fmtsEl.innerHTML = info.formats.map(f =>
+      `<span class="meta-tag" style="color:var(--accent)">${f}</span>`
+    ).join('');
+
+    document.getElementById('infoPanel').style.display = 'block';
+  }
+
+  // ─── Start Download ───
+  async function startDownload() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) { showError('Please enter a URL first.'); return; }
+    hideError();
+    stopPolling();
+    document.getElementById('downloadResult').style.display = 'none';
+    document.getElementById('progressSection').style.display = 'none';
+
+    setLoadingBtn('downloadBtn', true, 'Starting…');
+
+    try {
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          quality: document.getElementById('qualitySelect').value,
+          format: currentFormat,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Download failed');
+
+      if (data.cached) {
+        // Instant result from cache
+        showDownloadReady(data);
+      } else {
+        // Poll for progress
+        currentTaskId = data.task_id;
+        document.getElementById('progressSection').style.display = 'block';
+        setProgress(0, 'Waiting in queue…', 'queued');
+        startPolling(data.task_id);
+      }
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      setLoadingBtn('downloadBtn', false);
+    }
+  }
+
+  // ─── Polling ───
+  function startPolling(taskId) {
+    pollingInterval = setInterval(() => pollStatus(taskId), 1000);
+  }
+  function stopPolling() {
+    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+  }
+
+  async function pollStatus(taskId) {
+    try {
+      const res = await fetch(`/api/status/${taskId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (data.status === 'queued') {
+        setProgress(data.progress || 0, 'Waiting in queue…', 'queued');
+      } else if (data.status === 'processing') {
+        setProgress(data.progress || 5, `Downloading… ${Math.round(data.progress || 0)}%`, 'processing');
+      } else if (data.status === 'done') {
+        stopPolling();
+        setProgress(100, 'Download complete!', 'done');
+        setTimeout(() => {
+          document.getElementById('progressSection').style.display = 'none';
+          showDownloadReady(data);
+          refreshQueue();
+        }, 600);
+      } else if (data.status === 'error') {
+        stopPolling();
+        document.getElementById('progressSection').style.display = 'none';
+        showError('Download failed: ' + (data.error || 'Unknown error'));
+        refreshQueue();
+      }
+
+      refreshQueue();
+    } catch (e) { /* network hiccup — keep polling */ }
+  }
+
+  function showDownloadReady(data) {
+    const el = document.getElementById('downloadResult');
+    el.style.display = 'block';
+    document.getElementById('resultFilename').textContent = data.filename || 'downloaded_file';
+    const link = document.getElementById('downloadLink');
+    link.href = data.download_url;
+    link.download = data.filename || 'download';
+  }
+
+  // ─── Queue Status ───
+  async function refreshQueue() {
+    try {
+      const res = await fetch('/api/queue');
+      if (!res.ok) return;
+      const data = await res.json();
+      document.getElementById('statQueued').textContent = data.queue_length;
+      document.getElementById('statActive').textContent = data.active_downloads;
+      document.getElementById('statMax').textContent = data.max_concurrent;
+      document.getElementById('queueBadge').textContent =
+        data.queue_length + data.active_downloads;
+      renderTaskList(data.tasks || []);
+    } catch { /* ignore */ }
+  }
+
+  function renderTaskList(tasks) {
+    const list = document.getElementById('taskList');
+    if (!tasks.length) {
+      list.innerHTML = '<div class="empty-queue">Queue is empty — start a download above 🚀</div>';
+      return;
+    }
+    const ICONS = { queued:'⏳', processing:'⚙️', done:'✅', error:'❌' };
+    list.innerHTML = tasks.map(t => `
+      <div class="task-item">
+        <div class="task-emoji">${ICONS[t.status] || '📥'}</div>
+        <div class="task-info">
+          <div class="task-name">${t.title || t.task_id}</div>
+          <div class="task-meta">ID: ${t.task_id} &nbsp;·&nbsp; ${Math.round(t.progress || 0)}%</div>
+        </div>
+        <div class="task-status-badge ts-${t.status}">${capitalize(t.status)}</div>
+        ${t.status === 'done' && t.download_url
+          ? `<a href="${t.download_url}" class="btn btn-download" style="padding:7px 14px;font-size:12px" download>⬇️</a>`
+          : ''}
+      </div>
+    `).join('');
+  }
+
+  // ─── Init ───
+  refreshQueue();
+  setInterval(refreshQueue, 5000);   // Auto-refresh queue every 5s
+</script>
+</body>
+</html>
